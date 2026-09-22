@@ -1,0 +1,18 @@
+# Local credentials
+secrets.h
+
+# Original photos may contain camera/GPS metadata; commit only scrubbed copies.
+IMG_*.jpg
+
+# Arduino build output and editor files
+build/
+*.bin
+*.elf
+*.map
+*.hex
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
