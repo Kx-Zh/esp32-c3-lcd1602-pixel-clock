@@ -1,4 +1,4 @@
-# ESP32-C3 LCD1602 Pixel-Scan Network Clock
+# ESP32-C3 LCD1602 Animated Network Clock
 
 [English](#english) · [中文](#中文)
 
@@ -19,17 +19,18 @@ character rows while the new time is revealed above it.
 
 这是一个面向 ESP32-C3、HD44780 LCD1602 和 PCF8574T I²C 背包的 Arduino 网络时钟。
 它使用 LCD1602 仅有的 8 个 CGRAM 字符绘制双行大号 `HH:MM`，并在右下角显示两位
-科幻风格秒数。时间变化时，字模内部会出现从上向下移动的单像素全亮扫描线。
+科幻风格秒数。大号时间支持直接换字、像素扫描和分段翻页三种编译模式。
 
 ### 功能
 
 - 3×2 字符的大号 `HH:MM`，以及可选的两位秒数。
-- 分钟变化时双字符行同步进行 8 帧像素扫描；秒数字也有独立扫描动画。
+- 默认只对变化位进行四阶段分段翻页，也可选择 8 帧像素扫描或关闭动画；秒数字有独立扫描动画。
 - 支持普通 2.4 GHz WPA2-Personal。
 - 支持 WPA2-Enterprise PEAP/MSCHAPv2、ESP-IDF 默认 CA 包和严格服务器域名验证。
 - 使用三个 NTP 服务器，按 `CST-8` 换算为中国标准时间。
 - 断网后继续走时并在后台限速重连。
-- 首次联网前使用编译时间或 Flash 中保存的可信时间，避免证书校验与授时互相依赖。
+- LCD 在首次 NTP 同步前从 `00:00:00` 开始计时；内部仍使用编译时间或 Flash 中
+  保存的可信时间完成证书校验，避免证书校验与授时互相依赖。
 - 自带针对常见 `P0=RS, P1=RW, P2=EN, P3=背光, P4–P7=D4–D7` 背包的轻量驱动，
   不需要安装额外 LCD 库。
 
@@ -78,6 +79,17 @@ character rows while the new time is revealed above it.
 6、7 正常用于秒十位和个位；大字扫描期间秒数暂时隐藏，6、7 临时变成可扫描实心块
 和空白区扫描线，动画结束后再安全恢复秒数。
 
+大号 `HH:MM` 动画在 `config.h` 中选择，默认使用只更新变化数字的分段翻页：
+
+```cpp
+#define HHMM_ANIMATION_MODE HHMM_ANIMATION_SPLIT_FLIP
+// 可选：HHMM_ANIMATION_NONE / HHMM_ANIMATION_PIXEL_SCAN
+```
+
+`SPLIT_FLIP` 依次执行“上半部灭、上半部显示新数字、下半部灭、下半部显示
+新数字”，多个变化位同步进行。每阶段时长由 `HHMM_FLIP_PHASE_MS` 设置；该模式只
+修改变化数字的 DDRAM 单元，不重写 CGRAM，因此不会干扰右下角秒数。
+
 ### 网络、证书与时间
 
 企业模式使用 `WiFi.begin(..., WPA2_AUTH_PEAP, ...)` 选择 PEAP/MSCHAPv2。请在
@@ -88,6 +100,9 @@ NTP 首次同步超时为 20 秒，失败后每 5 分钟重试。同步成功后
 按其默认周期自动校时。可信时间最多每 24 小时写入一次 Preferences；ESP-IDF NVS
 自带磨损均衡，不会每秒写 Flash。
 
+首次 NTP 同步成功前，LCD 显示从 `00:00:00` 起步的开机计时；同步成功后自动切换为
+中国标准时间。用于 TLS 验证的内部系统时间与该临时显示相互独立。
+
 ### 串口诊断
 
 USB 串口会输出 I²C 扫描、LCD 初始化、Wi-Fi、证书域名、IP、NTP 和重连状态，但不会
@@ -97,20 +112,20 @@ USB 串口会输出 I²C 扫描、LCD 初始化、Wi-Fi、证书域名、IP、NT
 
 An Arduino network clock for the ESP32-C3, an HD44780-compatible 16×2 LCD,
 and a common PCF8574T I²C backpack. It uses all eight CGRAM slots to render a
-large two-row `HH:MM` clock plus optional sci-fi-style seconds. Digit changes
-are revealed by a one-pixel-high scan line moving through each 5×8 cell.
+large two-row `HH:MM` clock plus optional sci-fi-style seconds. The large clock
+offers direct, pixel-scan, and split-flip compile-time animation modes.
 
 ### Features
 
 - Large 3×2-character `HH:MM` display with optional two-digit seconds.
-- Eight-frame pixel scan transition for minute and second changes.
+- Four-stage changed-digit split flip by default, with optional pixel scan or no animation; seconds retain their own scan.
 - 2.4 GHz WPA2-Personal support.
 - WPA2-Enterprise PEAP/MSCHAPv2 with the ESP-IDF default CA bundle and strict
   authentication-server domain verification.
 - Three NTP servers with the `CST-8` timezone for China Standard Time.
 - Offline clock operation and rate-limited background reconnection.
-- Build-time or persisted trusted time prevents a certificate-validation/NTP
-  bootstrap loop.
+- The LCD starts at `00:00:00` before its first NTP sync, while build-time or
+  persisted trusted time remains available internally for certificate checks.
 - A small built-in PCF8574T driver for the common
   `P0=RS, P1=RW, P2=EN, P3=backlight, P4–P7=D4–D7` mapping; no LCD library is
   required.
@@ -154,6 +169,18 @@ hold the second digits. During a minute transition, seconds are hidden and
 slots 6–7 temporarily become the animated solid block and blank-cell scan
 line; normal second glyphs are restored only after the large display is safe.
 
+Select the large `HH:MM` animation in `config.h`:
+
+```cpp
+#define HHMM_ANIMATION_MODE HHMM_ANIMATION_SPLIT_FLIP
+// Alternatives: HHMM_ANIMATION_NONE / HHMM_ANIMATION_PIXEL_SCAN
+```
+
+The default split flip clears the changed digits' upper halves, draws their new
+upper halves, clears their lower halves, and finally draws the new lower halves.
+All changed positions move together. It touches DDRAM only, so the second-digit
+CGRAM glyphs remain intact. `HHMM_FLIP_PHASE_MS` controls each phase duration.
+
 ### Networking and time
 
 Enterprise mode selects PEAP/MSCHAPv2 through
@@ -165,6 +192,10 @@ Initial NTP synchronization times out after 20 seconds and retries every five
 minutes. After synchronization, the ESP32 SNTP client performs its normal
 periodic updates. Trusted time is written to Preferences no more than once per
 24 hours; ESP-IDF NVS supplies wear levelling.
+
+Before the first successful NTP sync, the LCD shows uptime beginning at
+`00:00:00`. It switches to China Standard Time after synchronization; the
+internal time used for TLS validation is independent of this temporary display.
 
 ### Diagnostics
 

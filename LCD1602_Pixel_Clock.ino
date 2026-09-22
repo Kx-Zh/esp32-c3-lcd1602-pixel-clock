@@ -57,6 +57,7 @@ static Preferences preferences;
 static bool lcdReady = false;
 static bool ntpConfigured = false;
 static bool ntpSynchronized = false;
+static bool displayTimeSynchronized = false;
 static bool ntpFailureShown = false;
 static uint32_t connectStartedAt = 0;
 static uint32_t nextWifiAttemptAt = 0;
@@ -72,6 +73,12 @@ static bool bigScanRestorePending = false;
 static uint8_t bigScanRow = 0;
 static uint8_t bigScanTarget[4] = {};
 static uint32_t bigScanFrameAt = 0;
+static bool splitFlipActive = false;
+static uint8_t splitFlipPhase = 0;
+static uint8_t splitFlipMask = 0;
+static uint8_t splitFlipPrevious[4] = {};
+static uint8_t splitFlipTarget[4] = {};
+static uint32_t splitFlipPhaseAt = 0;
 #if SHOW_SECONDS
 static bool secondsInitialized = false;
 static bool secondsScanActive = false;
@@ -182,6 +189,7 @@ static void showStatus(const char *line1, const char *line2, uint32_t holdMs = 0
   clockDigitsInitialized = false;
   bigScanActive = false;
   bigScanRestorePending = false;
+  splitFlipActive = false;
 #if SHOW_SECONDS
   secondsInitialized = false;
   secondsScanActive = false;
@@ -399,6 +407,20 @@ static void writeBigDigit(uint8_t row, uint8_t digit) {
   writeBigToken(row, token + 2);
 }
 
+static constexpr uint8_t BIG_DIGIT_COLUMNS[4] = {1, 4, 8, 11};
+
+static void writeBigDigitAt(uint8_t row, uint8_t position, uint8_t digit) {
+  lcd.setCursor(BIG_DIGIT_COLUMNS[position], row);
+  writeBigDigit(row, digit);
+}
+
+static void clearBigDigitAt(uint8_t row, uint8_t position) {
+  lcd.setCursor(BIG_DIGIT_COLUMNS[position], row);
+  lcd.write(' ');
+  lcd.write(' ');
+  lcd.write(' ');
+}
+
 #if SHOW_SECONDS
 static void loadSecondGlyph(uint8_t slot, uint8_t digit) {
   lcd.createChar(slot, SECOND_DIGITS[digit]);
@@ -581,18 +603,40 @@ static void writeCenterColon(bool visible, bool scanning) {
   }
 }
 
-static void drawBigClock(uint32_t nowMs) {
+static void readDisplayTime(uint32_t nowMs, uint8_t digits[4], uint8_t seconds[2]) {
+  uint8_t hour = 0;
+  uint8_t minute = 0;
+  uint8_t second = 0;
+
+  if (displayTimeSynchronized) {
+    const time_t epoch = time(nullptr);
+    struct tm local = {};
+    localtime_r(&epoch, &local);
+    hour = static_cast<uint8_t>(local.tm_hour);
+    minute = static_cast<uint8_t>(local.tm_min);
+    second = static_cast<uint8_t>(local.tm_sec);
+  } else {
+    // Before the first successful NTP sync, show uptime beginning at 00:00:00.
+    // The internal build/saved epoch remains available for TLS certificate checks.
+    const uint32_t elapsedSeconds = nowMs / 1000U;
+    hour = static_cast<uint8_t>((elapsedSeconds / 3600U) % 24U);
+    minute = static_cast<uint8_t>((elapsedSeconds / 60U) % 60U);
+    second = static_cast<uint8_t>(elapsedSeconds % 60U);
+  }
+
+  digits[0] = static_cast<uint8_t>(hour / 10U);
+  digits[1] = static_cast<uint8_t>(hour % 10U);
+  digits[2] = static_cast<uint8_t>(minute / 10U);
+  digits[3] = static_cast<uint8_t>(minute % 10U);
+  seconds[0] = static_cast<uint8_t>(second / 10U);
+  seconds[1] = static_cast<uint8_t>(second % 10U);
+}
+
+static void drawBigClockPixelScan(uint32_t nowMs) {
   if (!lcdReady) return;
-  time_t now = time(nullptr);
-  struct tm local = {};
-  localtime_r(&now, &local);
-  const uint8_t actualDigits[4] = {
-    static_cast<uint8_t>(local.tm_hour / 10), static_cast<uint8_t>(local.tm_hour % 10),
-    static_cast<uint8_t>(local.tm_min / 10), static_cast<uint8_t>(local.tm_min % 10)
-  };
-  const uint8_t actualSeconds[2] = {
-    static_cast<uint8_t>(local.tm_sec / 10), static_cast<uint8_t>(local.tm_sec % 10)
-  };
+  uint8_t actualDigits[4] = {};
+  uint8_t actualSeconds[2] = {};
+  readDisplayTime(nowMs, actualDigits, actualSeconds);
 
   updateBigScan(actualDigits, actualSeconds, nowMs);
 #if SHOW_SECONDS
@@ -651,6 +695,111 @@ static void drawBigClock(uint32_t nowMs) {
 #endif
 }
 
+static void drawNormalClockFrame(const uint8_t digits[4], const uint8_t seconds[2]) {
+  loadNormalCgram(seconds);
+  for (uint8_t position = 0; position < 4; ++position) {
+    writeBigDigitAt(0, position, digits[position]);
+    writeBigDigitAt(1, position, digits[position]);
+  }
+  lcd.setCursor(0, 0);
+  lcd.write(' ');
+  lcd.setCursor(0, 1);
+  lcd.write(' ');
+  lcd.setCursor(14, 0);
+  lcd.write(' ');
+  lcd.write(' ');
+#if SHOW_SECONDS
+  memcpy(secondsPrevious, seconds, sizeof(secondsPrevious));
+  memcpy(secondsTarget, seconds, sizeof(secondsTarget));
+  secondsInitialized = true;
+  secondsScanActive = false;
+#endif
+}
+
+static void renderSplitFlipPhase() {
+  const uint8_t row = splitFlipPhase < 2 ? 0 : 1;
+  const bool showNewHalf = (splitFlipPhase & 1U) != 0;
+  for (uint8_t position = 0; position < 4; ++position) {
+    if ((splitFlipMask & (1U << position)) == 0) continue;
+    if (showNewHalf) writeBigDigitAt(row, position, splitFlipTarget[position]);
+    else clearBigDigitAt(row, position);
+  }
+}
+
+static void drawBigClockDirectOrFlip(uint32_t nowMs) {
+  uint8_t actualDigits[4] = {};
+  uint8_t actualSeconds[2] = {};
+  readDisplayTime(nowMs, actualDigits, actualSeconds);
+
+  if (!clockDigitsInitialized) {
+    memcpy(splitFlipTarget, actualDigits, sizeof(splitFlipTarget));
+    memcpy(splitFlipPrevious, actualDigits, sizeof(splitFlipPrevious));
+    drawNormalClockFrame(actualDigits, actualSeconds);
+    clockDigitsInitialized = true;
+  }
+
+#if HHMM_ANIMATION_MODE == HHMM_ANIMATION_NONE
+  if (memcmp(actualDigits, splitFlipTarget, sizeof(splitFlipTarget)) != 0) {
+    for (uint8_t position = 0; position < 4; ++position) {
+      if (actualDigits[position] == splitFlipTarget[position]) continue;
+      writeBigDigitAt(0, position, actualDigits[position]);
+      writeBigDigitAt(1, position, actualDigits[position]);
+    }
+    memcpy(splitFlipTarget, actualDigits, sizeof(splitFlipTarget));
+  }
+#else
+  if (!splitFlipActive && memcmp(actualDigits, splitFlipTarget, sizeof(splitFlipTarget)) != 0) {
+    memcpy(splitFlipPrevious, splitFlipTarget, sizeof(splitFlipPrevious));
+    memcpy(splitFlipTarget, actualDigits, sizeof(splitFlipTarget));
+    splitFlipMask = 0;
+    for (uint8_t position = 0; position < 4; ++position) {
+      if (splitFlipPrevious[position] != splitFlipTarget[position]) {
+        splitFlipMask |= static_cast<uint8_t>(1U << position);
+      }
+    }
+    splitFlipActive = splitFlipMask != 0;
+    splitFlipPhase = 0;
+    splitFlipPhaseAt = nowMs;
+    if (splitFlipActive) renderSplitFlipPhase();
+  }
+
+  if (splitFlipActive && nowMs - splitFlipPhaseAt >= HHMM_FLIP_PHASE_MS) {
+    splitFlipPhaseAt = nowMs;
+    if (splitFlipPhase < 3) {
+      ++splitFlipPhase;
+      renderSplitFlipPhase();
+    } else {
+      splitFlipActive = false;
+      splitFlipMask = 0;
+    }
+  }
+#endif
+
+  lcd.setCursor(7, 0);
+  writeCenterColon(lastColonVisible, false);
+  lcd.setCursor(7, 1);
+  writeCenterColon(lastColonVisible, false);
+
+#if SHOW_SECONDS
+  updateSecondsScan(actualSeconds, nowMs);
+  lcd.setCursor(14, 1);
+  lcd.write(SECOND_GLYPH_TENS);
+  lcd.write(SECOND_GLYPH_ONES);
+#else
+  lcd.setCursor(14, 1);
+  lcd.write(' ');
+  lcd.write(' ');
+#endif
+}
+
+static void drawBigClock(uint32_t nowMs) {
+#if HHMM_ANIMATION_MODE == HHMM_ANIMATION_PIXEL_SCAN
+  drawBigClockPixelScan(nowMs);
+#else
+  drawBigClockDirectOrFlip(nowMs);
+#endif
+}
+
 // ---------- Network state machine ----------
 static void updateNetworkAndTime() {
   const uint32_t now = millis();
@@ -680,6 +829,7 @@ static void updateNetworkAndTime() {
 #endif
       if (syncComplete) {
         ntpSynchronized = true;
+        displayTimeSynchronized = true;
         saveCurrentTime();
         USB_SERIAL_PORT.println("NTP synchronization complete");
         const String ip = WiFi.localIP().toString();
@@ -722,6 +872,13 @@ void setup() {
   delay(300);
   USB_SERIAL_PORT.println();
   USB_SERIAL_PORT.println("ESP32-C3 LCD1602 network clock");
+#if HHMM_ANIMATION_MODE == HHMM_ANIMATION_SPLIT_FLIP
+  USB_SERIAL_PORT.println("HH:MM animation: split flip (changed digits only)");
+#elif HHMM_ANIMATION_MODE == HHMM_ANIMATION_PIXEL_SCAN
+  USB_SERIAL_PORT.println("HH:MM animation: pixel scan");
+#else
+  USB_SERIAL_PORT.println("HH:MM animation: none");
+#endif
 
   preferences.begin("pixel-clock", false);
   restoreLastKnownTime();
@@ -773,7 +930,13 @@ void loop() {
   // second boundary is detected promptly.
   const uint32_t refreshInterval = SECOND_SCAN_FRAME_MS;
 #else
+#if HHMM_ANIMATION_MODE == HHMM_ANIMATION_PIXEL_SCAN
   const uint32_t refreshInterval = bigScanActive ? PIXEL_SCAN_FRAME_MS : 500U;
+#elif HHMM_ANIMATION_MODE == HHMM_ANIMATION_SPLIT_FLIP
+  const uint32_t refreshInterval = splitFlipActive ? HHMM_FLIP_PHASE_MS : 500U;
+#else
+  const uint32_t refreshInterval = 500U;
+#endif
 #endif
   if (lcdReady && !persistentError && statusHoldFinished
       && now - lastClockDrawAt >= refreshInterval) {

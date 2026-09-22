@@ -23,6 +23,22 @@ static constexpr uint8_t LCD_PCF8574_BL_MASK = 0x08;  // P3, active high
 #error "SHOW_SECONDS must be 0 or 1"
 #endif
 
+// ---------- HH:MM animation ----------
+#define HHMM_ANIMATION_NONE        0
+#define HHMM_ANIMATION_PIXEL_SCAN  1
+#define HHMM_ANIMATION_SPLIT_FLIP  2
+
+// SPLIT_FLIP updates only digits that changed. PIXEL_SCAN keeps the original
+// CGRAM scan-line animation, while NONE changes the digits immediately.
+#define HHMM_ANIMATION_MODE HHMM_ANIMATION_SPLIT_FLIP
+#if HHMM_ANIMATION_MODE != HHMM_ANIMATION_NONE && \
+    HHMM_ANIMATION_MODE != HHMM_ANIMATION_PIXEL_SCAN && \
+    HHMM_ANIMATION_MODE != HHMM_ANIMATION_SPLIT_FLIP
+#error "Invalid HHMM_ANIMATION_MODE"
+#endif
+
+static constexpr uint32_t HHMM_FLIP_PHASE_MS = 100;
+
 // ---------- Wi-Fi profile ----------
 #define NETWORK_MODE_ENTERPRISE_EAP 1
 #define NETWORK_MODE_WPA2_PERSONAL  2
