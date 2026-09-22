@@ -128,4 +128,3 @@ class Pcf8574tLcd {
   uint8_t rows_ = 2;
   bool backlightOn_ = true;
 };
-
