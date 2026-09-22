@@ -52,4 +52,3 @@ static constexpr uint32_t SECOND_SCAN_FRAME_MS = PIXEL_SCAN_FRAME_MS / 2U;
 
 // 2024-01-01 UTC. Earlier values are treated as unsynchronised.
 static constexpr time_t MIN_VALID_EPOCH = 1704067200;
-
