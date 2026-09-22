@@ -13,4 +13,3 @@ static constexpr char EAP_PASSWORD[] = "YOUR_EAP_PASSWORD";
 // WPA2-Personal
 static constexpr char PERSONAL_WIFI_SSID[] = "YOUR_WIFI_SSID";
 static constexpr char PERSONAL_WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
-
