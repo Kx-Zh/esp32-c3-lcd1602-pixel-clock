@@ -1,6 +1,3 @@
-# Local credentials
-secrets.h
-
 # Original photos may contain camera/GPS metadata; commit only scrubbed copies.
 IMG_*.jpg
 

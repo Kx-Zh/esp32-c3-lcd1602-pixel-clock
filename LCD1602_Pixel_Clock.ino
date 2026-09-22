@@ -723,7 +723,7 @@ void setup() {
   USB_SERIAL_PORT.println();
   USB_SERIAL_PORT.println("ESP32-C3 LCD1602 network clock");
 
-  preferences.begin("sjtu-clock", false);
+  preferences.begin("pixel-clock", false);
   restoreLastKnownTime();
 
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);

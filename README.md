@@ -56,8 +56,8 @@ character rows while the new time is revealed above it.
 2. 选择 `ESP32C3 Dev Module`。
 3. 启用 `USB CDC On Boot`；如果菜单提供该项，选择
    `USB Mode: Hardware CDC and JTAG`。
-4. 将 `secrets.example.h` 复制为 `secrets.h`，把其中 `YOUR_...` 提示占位符替换为
-   自己的 SSID、密码和 EAP 参数。`secrets.h` 已被 Git 忽略，不要强制提交。
+4. 打开 `secrets.h`，把其中 `YOUR_...` 提示占位符替换为自己的 SSID、密码和
+   EAP 参数。提交或分享代码前，请重新改回占位符，避免泄露凭据。
 5. 在 `config.h` 选择网络模式：
 
    ```cpp
@@ -66,7 +66,7 @@ character rows while the new time is revealed above it.
    #define NETWORK_MODE NETWORK_MODE_ENTERPRISE_EAP
    ```
 
-6. 打开 `LCD1602_SJTU_Clock.ino`，编译并上传。
+6. 打开 `LCD1602_Pixel_Clock.ino`，编译并上传。
 
 隐藏右下角秒数：
 
@@ -141,12 +141,12 @@ display becomes unstable, set `I2C_CLOCK_HZ` back to `100000`.
 2. Select `ESP32C3 Dev Module`.
 3. Enable `USB CDC On Boot` and, when available, select
    `USB Mode: Hardware CDC and JTAG`.
-4. Copy `secrets.example.h` to `secrets.h`, then replace every `YOUR_...`
-   prompt placeholder with your own SSID, passwords, and EAP settings. The
-   local file is ignored by Git.
+4. Open `secrets.h`, then replace every `YOUR_...` prompt placeholder with
+   your own SSID, passwords, and EAP settings. Restore the placeholders before
+   committing or sharing the code so credentials are not exposed.
 5. Select `NETWORK_MODE_WPA2_PERSONAL` or
    `NETWORK_MODE_ENTERPRISE_EAP` in `config.h`.
-6. Open `LCD1602_SJTU_Clock.ino`, compile, and upload.
+6. Open `LCD1602_Pixel_Clock.ino`, compile, and upload.
 
 Set `SHOW_SECONDS` to `0` to hide seconds and restore the custom block colon.
 With seconds enabled, CGRAM 0–5 hold the large-number pieces and slots 6–7

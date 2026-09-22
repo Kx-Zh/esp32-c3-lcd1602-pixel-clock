@@ -1,7 +1,7 @@
 #pragma once
 
-// Copy this file to secrets.h, then fill in only the profile you use.
-// secrets.h is ignored by Git and must never be committed.
+// Replace only the placeholders for the network profile you use.
+// Restore these placeholders before committing or sharing this file.
 
 // WPA2-Enterprise PEAP/MSCHAPv2
 static constexpr char ENTERPRISE_WIFI_SSID[] = "YOUR_ENTERPRISE_SSID";
