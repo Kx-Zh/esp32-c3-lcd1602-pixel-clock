@@ -167,4 +167,3 @@ LCD is disconnected.
 ## License
 
 MIT. See [LICENSE](./LICENSE).
-
