@@ -4,7 +4,16 @@
 
 ![Clock display / 时钟显示效果](./docs/images/clock-display.jpg)
 
+**图 1 / Figure 1 — 正常时钟显示 / Normal clock display.** 3×2 字符大号
+`HH:MM` 位于左侧，右下角为两位自定义秒数字形。The 3×2-character large
+`HH:MM` occupies the left side, with two custom second digits at the lower right.
+
 ![Pixel scan transition / 像素扫描线刷新过程](./docs/images/pixel-scan.jpg)
+
+**图 2 / Figure 2 — 像素扫描线刷新 / Pixel-scan transition.** 分钟变化时，
+上下两个 5×8 字符行中的全亮扫描线同步向下移动，并在扫描线上方逐行显现新时间。
+On a minute change, a full-width pixel line moves downward through both 5×8
+character rows while the new time is revealed above it.
 
 ## 中文
 
