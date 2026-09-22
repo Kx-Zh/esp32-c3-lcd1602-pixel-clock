@@ -30,7 +30,7 @@ static constexpr uint8_t LCD_PCF8574_BL_MASK = 0x08;  // P3, active high
 
 // SPLIT_FLIP updates only digits that changed. PIXEL_SCAN keeps the original
 // CGRAM scan-line animation, while NONE changes the digits immediately.
-#define HHMM_ANIMATION_MODE HHMM_ANIMATION_SPLIT_FLIP
+#define HHMM_ANIMATION_MODE HHMM_ANIMATION_PIXEL_SCAN
 #if HHMM_ANIMATION_MODE != HHMM_ANIMATION_NONE && \
     HHMM_ANIMATION_MODE != HHMM_ANIMATION_PIXEL_SCAN && \
     HHMM_ANIMATION_MODE != HHMM_ANIMATION_SPLIT_FLIP

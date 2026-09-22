@@ -24,7 +24,7 @@ character rows while the new time is revealed above it.
 ### 功能
 
 - 3×2 字符的大号 `HH:MM`，以及可选的两位秒数。
-- 默认只对变化位进行四阶段分段翻页，也可选择 8 帧像素扫描或关闭动画；秒数字有独立扫描动画。
+- 默认使用 8 帧像素扫描，也可选择只更新变化位的四阶段分段翻页或关闭动画；秒数字有独立扫描动画。
 - 支持普通 2.4 GHz WPA2-Personal。
 - 支持 WPA2-Enterprise PEAP/MSCHAPv2、ESP-IDF 默认 CA 包和严格服务器域名验证。
 - 使用三个 NTP 服务器，按 `CST-8` 换算为中国标准时间。
@@ -79,11 +79,11 @@ character rows while the new time is revealed above it.
 6、7 正常用于秒十位和个位；大字扫描期间秒数暂时隐藏，6、7 临时变成可扫描实心块
 和空白区扫描线，动画结束后再安全恢复秒数。
 
-大号 `HH:MM` 动画在 `config.h` 中选择，默认使用只更新变化数字的分段翻页：
+大号 `HH:MM` 动画在 `config.h` 中选择，默认使用像素扫描：
 
 ```cpp
-#define HHMM_ANIMATION_MODE HHMM_ANIMATION_SPLIT_FLIP
-// 可选：HHMM_ANIMATION_NONE / HHMM_ANIMATION_PIXEL_SCAN
+#define HHMM_ANIMATION_MODE HHMM_ANIMATION_PIXEL_SCAN
+// 可选：HHMM_ANIMATION_NONE / HHMM_ANIMATION_SPLIT_FLIP
 ```
 
 `SPLIT_FLIP` 依次执行“上半部灭、上半部显示新数字、下半部灭、下半部显示
@@ -118,7 +118,7 @@ offers direct, pixel-scan, and split-flip compile-time animation modes.
 ### Features
 
 - Large 3×2-character `HH:MM` display with optional two-digit seconds.
-- Four-stage changed-digit split flip by default, with optional pixel scan or no animation; seconds retain their own scan.
+- Eight-frame pixel scan by default, with optional changed-digit split flip or no animation; seconds retain their own scan.
 - 2.4 GHz WPA2-Personal support.
 - WPA2-Enterprise PEAP/MSCHAPv2 with the ESP-IDF default CA bundle and strict
   authentication-server domain verification.
@@ -172,11 +172,11 @@ line; normal second glyphs are restored only after the large display is safe.
 Select the large `HH:MM` animation in `config.h`:
 
 ```cpp
-#define HHMM_ANIMATION_MODE HHMM_ANIMATION_SPLIT_FLIP
-// Alternatives: HHMM_ANIMATION_NONE / HHMM_ANIMATION_PIXEL_SCAN
+#define HHMM_ANIMATION_MODE HHMM_ANIMATION_PIXEL_SCAN
+// Alternatives: HHMM_ANIMATION_NONE / HHMM_ANIMATION_SPLIT_FLIP
 ```
 
-The default split flip clears the changed digits' upper halves, draws their new
+The split-flip mode clears the changed digits' upper halves, draws their new
 upper halves, clears their lower halves, and finally draws the new lower halves.
 All changed positions move together. It touches DDRAM only, so the second-digit
 CGRAM glyphs remain intact. `HHMM_FLIP_PHASE_MS` controls each phase duration.
